@@ -515,7 +515,25 @@ class UserDataManager {
                     instanceId: this.currentSession.instanceId,
                     fromInstance: this.currentSession.fromInstance,
                     partySize: players.length,
-                    snapshot: { players, usersAgg: snapshotUsers },
+                    snapshot: { players, usersAgg: snapshotUsers, users: (function(){
+                        const u = {};
+                        for (const [uid, user] of (function(){
+                            const arr = [];
+                            for (const m of this._allUserMaps()) for (const e of m.entries()) arr.push(e);
+                            return arr;
+                        }).call(this)) {
+                            // user is a UserData instance
+                            u[String(uid)] = {
+                                uid: user.uid,
+                                name: user.name,
+                                profession: user.profession + (user.subProfession ? `-${user.subProfession}` : ''),
+                                subProfession: user.subProfession,
+                                skills: user.getSkillSummary(),
+                                attr: user.attr,
+                            };
+                        }
+                        return u;
+                    }).call(this) },
                 };
 
                 try {
@@ -597,7 +615,20 @@ class UserDataManager {
             instanceId: this.currentSession.instanceId,
             fromInstance: this.currentSession.fromInstance,
             partySize: players.length,
-            snapshot: { usersAgg: snapshotUsers, players },
+            snapshot: { usersAgg: snapshotUsers, players, users: (function(){
+                const u = {};
+                for (const [uid, user] of this._getAllUserEntries()) {
+                    u[String(uid)] = {
+                        uid: user.uid,
+                        name: user.name,
+                        profession: user.profession + (user.subProfession ? `-${user.subProfession}` : ''),
+                        subProfession: user.subProfession,
+                        skills: user.getSkillSummary(),
+                        attr: user.attr,
+                    };
+                }
+                return u;
+            }).call(this) },
         };
 
         try {
