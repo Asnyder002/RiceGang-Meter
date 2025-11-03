@@ -58,10 +58,13 @@
             if (!entry.name || (it.name && String(it.name).length > String(entry.name).length)) entry.name = it.name;
 
             const type = (it.type || "").toLowerCase();
-            const amount = it.damage || it.totalDamage || 0;
+            // Choose amount based on whether this is a healing skill or not.
+            // Older payloads may provide `damage`/`totalDamage` only, newer ones include `heal`/`totalHealing`.
+            const isHealing = type === "healing" || Number(it.id) >= HEAL_OFFSET;
+            const amount = isHealing ? (it.heal || it.totalHealing || 0) : (it.damage || it.totalDamage || 0);
             const count = Number(it.casts ?? it.totalCount ?? (it.countBreakdown && typeof it.countBreakdown.total === "number" ? it.countBreakdown.total : undefined) ?? it.hits ?? 0) || 0;
 
-            if (type === "healing" || Number(it.id) >= HEAL_OFFSET) { entry.heal += amount; entry.healCasts += count; }
+            if (isHealing) { entry.heal += amount; entry.healCasts += count; }
             else { entry.damage += amount; entry.dmgCasts += count; }
 
             entry.casts = entry.dmgCasts + entry.healCasts;
@@ -306,6 +309,15 @@
                 document.querySelectorAll(".seg-btn").forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
                 modeFilter = btn.dataset.mode;
+                // Default sorting per tab: DPS/All -> sort by damage share, Heal -> sort by heal share
+                if (modeFilter === "heal") {
+                    sortKey = "shareHeal";
+                    sortDir = "desc";
+                } else {
+                    // "all" and "dmg" default to damage-sorted
+                    sortKey = "shareDmg";
+                    sortDir = "desc";
+                }
                 savePrefs(); rebuildTable();
             }, { passive: true });
         });
@@ -373,7 +385,7 @@
         localStorage.setItem(PREF_KEY, JSON.stringify({ sortKey, sortDir, search: search.value, modeFilter }));
     };
     const niceStep = (max) => {
-        // renvoie un "tick" agréable (1,2,5 * 10^n)
+        // renvoie un "tick" agrï¿½able (1,2,5 * 10^n)
         const exp = Math.floor(Math.log10(max || 1));
         const f = max / Math.pow(10, exp);
         let nf = 1; if (f > 1.5) nf = 2; if (f > 3.5) nf = 5; if (f > 7.5) nf = 10;
@@ -434,11 +446,11 @@
             scopeCtx.clearRect(0, 0, W, H);
         }
 
-        // Remettre la légende à neutre
+        // Remettre la lï¿½gende ï¿½ neutre
         const ids = ["lgDpsNow", "lgDpsAvg", "lgHpsNow", "lgHpsAvg"];
         for (const id of ids) {
             const el = document.getElementById(id);
-            if (el) el.textContent = "–";
+            if (el) el.textContent = "ï¿½";
         }
     };
 
@@ -461,13 +473,13 @@
         const m = { l: 56, r: 10, t: 8, b: 22 };
         const panel = { x: m.l, y: m.t, w: W - m.l - m.r, h: H - m.t - m.b };
 
-        // fond léger
+        // fond lï¿½ger
         scopeCtx.fillStyle = "rgba(255,255,255,.02)";
         scopeCtx.fillRect(0, 0, W, H);
 
         if (!scopeData.length) return;
 
-        // --- Échelle commune DPS/HPS ---
+        // --- ï¿½chelle commune DPS/HPS ---
         const maxD = Math.max(1, ...scopeData.map(p => p.dps));
         const maxH = Math.max(1, ...scopeData.map(p => p.hps));
         const maxAll = Math.max(maxD, maxH);
@@ -505,7 +517,7 @@
         scopeCtx.strokeStyle = "rgba(255,255,255,.16)";
         scopeCtx.strokeRect(panel.x, panel.y, panel.w, panel.h);
 
-        // --- Courbes (chevauchées) ---
+        // --- Courbes (chevauchï¿½es) ---
         const drawSeries = (color, acc) => {
             scopeCtx.strokeStyle = color; scopeCtx.lineWidth = 2; scopeCtx.setLineDash([]);
             scopeCtx.beginPath();
@@ -562,7 +574,7 @@
             scopeCtx.fillText(`${(SCOPE_WINDOW_SEC - Math.round((tt - t0))).toString()}s`, X, panel.y + panel.h + 2);
         }
 
-        // --- Légende (valeurs live) ---
+        // --- Lï¿½gende (valeurs live) ---
         const nowP = scopeData.at(-1);
         document.getElementById("lgDpsNow").textContent = numberFmt.format(nowP?.dps || 0);
         document.getElementById("lgDpsAvg").textContent = numberFmt.format(dAvg);

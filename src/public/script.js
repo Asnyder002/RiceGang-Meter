@@ -408,7 +408,8 @@
             const merged = mergeSkills(entry.skills);
             const items = Object.entries(merged)
                 .map(([id, d]) => {
-                    const damage = d.totalDamage || 0;
+                    const totalDamage = Number(d.totalDamage ?? d.total_damage ?? 0) || 0;
+                    const totalHealing = Number(d.totalHealing ?? d.total_healing ?? 0) || 0;
                     // ✅ ajoute toutes les sources possibles de "casts"
                     const casts = d.totalCount ?? d.countBreakdown?.total ?? d.totalHits ?? d.hits ?? 0;
 
@@ -419,18 +420,21 @@
                         id,
                         name: d.displayName || id,
                         type: (d.type || "").toLowerCase(),     // "healing" / "damage"
-                        damage,
+                        damage: totalDamage,
+                        heal: totalHealing,
+                        totalDamage: totalDamage,
+                        totalHealing: totalHealing,
                         casts,                                   // <<--- NOUVEAU
                         hits,                                    // conservé pour l'ancien details.html
                         critHits,
-                        avg: hits > 0 ? damage / hits : 0,
+                        avg: hits > 0 ? totalDamage / hits : 0,
                         critRate: hits > 0 ? (critHits / hits) * 100 : 0,
                         countBreakdown: d.countBreakdown || null // optionnel, utile au debug
                     };
                 })
-                .filter(x => x.damage > 0);
+                .filter(x => (x.damage || x.heal) > 0);
 
-            const total = items.reduce((s, i) => s + i.damage, 0) || 1;
+            const total = items.reduce((s, i) => s + (i.damage || 0), 0) || 1;
             const classKey = getClassKey(user.profession);
             return { user, items, total, classKey };
         },

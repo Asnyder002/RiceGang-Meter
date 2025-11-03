@@ -366,21 +366,29 @@ export function createApiRouter(isPausedInit, SETTINGS_PATH, LOGS_DIR) {
                 return 'default';
             };
 
-            // Build items array from skills map if available
+            // Build items array from skills map if available (include healing fields)
             const items = [];
+            let castsSum = 0;
             if (skills && typeof skills === 'object') {
                 for (const [idk, d] of Object.entries(skills)) {
-                    const damage = Number(d?.totalDamage ?? d?.total_damage ?? 0) || 0;
+                    const totalDamage = Number(d?.totalDamage ?? d?.total_damage ?? 0) || 0;
+                    const totalHealing = Number(d?.totalHealing ?? d?.total_healing ?? 0) || 0;
+                    const damage = totalDamage || 0;
+                    const heal = totalHealing || 0;
                     const casts = Number(d?.totalCount ?? d?.countBreakdown?.total ?? d?.totalHits ?? d?.hits ?? 0) || 0;
                     const critHits = Number(d?.critCount ?? d?.critHits ?? 0) || 0;
                     const hits = casts;
-                    const avg = hits > 0 ? damage / hits : 0;
+                    const avg = hits > 0 ? (damage / hits) : 0;
                     const critRate = hits > 0 ? (critHits / hits) * 100 : 0;
+                    castsSum += casts;
                     items.push({
                         id: idk,
                         name: d?.displayName || d?.name || idk,
                         type: String(d?.type || '').toLowerCase(),
                         damage,
+                        heal,
+                        totalDamage: totalDamage,
+                        totalHealing: totalHealing,
                         casts,
                         hits,
                         critHits,
@@ -391,11 +399,105 @@ export function createApiRouter(isPausedInit, SETTINGS_PATH, LOGS_DIR) {
                 }
             }
 
-            const total = items.reduce((s, it) => s + (it.damage || 0), 0) || 1;
+                // Fallback for older sessions: if no per-skill `skills` map was saved,
+                // attempt to synthesize items from legacy `topAllSpells` / `topDamageSpells` / `topHealSpells`
+                if (items.length === 0) {
+                    const maybeTop = userEntry.topAllSpells || userEntry.topAll || userEntry.topSpells || null;
+                    if (Array.isArray(maybeTop) && maybeTop.length) {
+                        for (const s of maybeTop) {
+                            const dmg = Number(s?.damage ?? s?.value ?? s?.dmg ?? 0) || 0;
+                            const heal = Number(s?.heal ?? 0) || 0;
+                            const kind = String(s?.kind || s?.type || "").toLowerCase();
+                            items.push({
+                                id: String(s?.id ?? s?.skillId ?? (s?.skill ?? (s?.name ?? Math.random()).toString())),
+                                name: s?.name || s?.displayName || String(s?.id ?? ""),
+                                type: kind === "heal" || kind.startsWith("h") ? "healing" : "damage",
+                                damage: dmg,
+                                heal: heal,
+                                totalDamage: dmg,
+                                totalHealing: heal,
+                                casts: s?.count ?? s?.casts ?? 0,
+                                hits: s?.count ?? s?.casts ?? 0,
+                                critHits: 0,
+                                avg: 0,
+                                critRate: 0,
+                                countBreakdown: null,
+                            });
+                        }
+                    } else {
+                        // try separate arrays
+                        const dlist = Array.isArray(userEntry.topDamageSpells) ? userEntry.topDamageSpells : [];
+                        const hlist = Array.isArray(userEntry.topHealSpells) ? userEntry.topHealSpells : [];
+                        for (const s of dlist) {
+                            items.push({
+                                id: String(s?.id ?? (s?.skill ?? (s?.name ?? Math.random()))),
+                                name: s?.name || s?.displayName || String(s?.id ?? ""),
+                                type: "damage",
+                                damage: Number(s?.damage ?? s?.value ?? 0) || 0,
+                                heal: 0,
+                                totalDamage: Number(s?.damage ?? s?.value ?? 0) || 0,
+                                totalHealing: 0,
+                                casts: s?.count ?? 0,
+                                hits: s?.count ?? 0,
+                                critHits: 0,
+                                avg: 0,
+                                critRate: 0,
+                                countBreakdown: null,
+                            });
+                        }
+                        for (const s of hlist) {
+                            items.push({
+                                id: String(s?.id ?? (s?.skill ?? (s?.name ?? Math.random()))),
+                                name: s?.name || s?.displayName || String(s?.id ?? ""),
+                                type: "healing",
+                                damage: 0,
+                                heal: Number(s?.heal ?? s?.value ?? 0) || 0,
+                                totalDamage: 0,
+                                totalHealing: Number(s?.heal ?? s?.value ?? 0) || 0,
+                                casts: s?.count ?? 0,
+                                hits: s?.count ?? 0,
+                                critHits: 0,
+                                avg: 0,
+                                critRate: 0,
+                                countBreakdown: null,
+                            });
+                        }
+                    }
+                }
+
+            const totalDamage = items.reduce((s, it) => s + (it.damage || 0), 0) || 0;
+            const totalHeal = items.reduce((s, it) => s + (it.heal || 0), 0) || 0;
+            const total = totalDamage || 1;
             const classKey = getClassKey(userEntry.profession || userEntry.class || userEntry.professionName || '');
 
+            // Build a user object that mirrors the live `UserData.getSummary()` shape
+            const durationSec = (sess?.durationMs && sess.durationMs > 0) ? (sess.durationMs / 1000) : null;
+            const userWithTotals = {
+                id: Number(uid),
+                uid: Number(uid),
+                name: userEntry.name,
+                profession: userEntry.profession || '',
+                subProfession: userEntry.subProfession || '',
+                fightPoint: userEntry.fightPoint ?? userEntry.fp ?? 0,
+                realtime_dps: durationSec ? Math.round(totalDamage / Math.max(1, Math.min(durationSec, 1))) : 0,
+                realtime_dps_max: 0,
+                total_dps: durationSec ? (totalDamage && durationSec ? Math.round(totalDamage / durationSec) : 0) : 0,
+                total_damage: { total: totalDamage },
+                total_count: { total: castsSum },
+                realtime_hps: durationSec ? Math.round(totalHeal / Math.max(1, Math.min(durationSec, 1))) : 0,
+                realtime_hps_max: 0,
+                total_hps: durationSec ? (totalHeal && durationSec ? Math.round(totalHeal / durationSec) : 0) : 0,
+                total_healing: { total: totalHeal },
+                taken_damage: userEntry.attr?.taken_damage ?? userEntry.taken_damage ?? 0,
+                hp: userEntry.attr?.hp ?? userEntry.hp ?? null,
+                max_hp: userEntry.attr?.max_hp ?? userEntry.max_hp ?? null,
+                dead_count: userEntry.attr?.dead_count ?? userEntry.dead_count ?? 0,
+                // preserve raw attrs for advanced UI
+                attr: userEntry.attr || {},
+            };
+
             const payload = {
-                user: userEntry,
+                user: userWithTotals,
                 items,
                 total,
                 classKey,
