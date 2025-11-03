@@ -1,6 +1,6 @@
 {
-    "name": "bpsr_pso_sx",
-    "productName": "BPSR PSO SX - Beta",
+    "name": "ricegang-meter",
+    "productName": "RiceGang Meter",
     "version": "0.1.3",
     "description": "Blue Protocol: Star Resonance - Per Second Overlay By Sola",
     "main": "src/index.js",
@@ -29,7 +29,7 @@
                 }
             ],
             "packagerConfig": {
-                "name": "BPSR PSO SX",
+                "name": "ricegang-meter",
                 "icon": "./resources/app.ico",
                 "asar": true,
                 "ignore": [

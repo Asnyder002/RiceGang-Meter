@@ -3,7 +3,7 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
     packagerConfig: {
-        name: 'BPSR-PSO-SX',
+        name: 'ricegang-meter',
         icon: './resources/ico',
         asar: true,
         extraResource: ['./resources/npcap-1.83.exe'],
