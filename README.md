@@ -21,7 +21,7 @@ RiceGang Meter is an overlay / monitoring tool for Blue Protocol that tracks pla
 This project is based on and builds upon the work of two prior projects:  
 - [StarResonanceDamageCounter](https://github.com/dmlgzs/StarResonanceDamageCounter) — originally designed for Blue Protocol, providing DPS/HPS tracking.  
 - [BPSR-PSO](https://github.com/Chase-Simmons/BPSR-PSO.git) by Chase Simmons — a forkable version of the above, providing the base architecture for this project.
-- [BPSR-PSO](https://github.com/Sola-Ray/BPSR-PSO-SX) by Sola-Ray — extended the DPS/HPS meters will live skill breakdowns and session.
+- [BPSR-PSO-SX](https://github.com/Sola-Ray/BPSR-PSO-SX) by Sola-Ray — extended the DPS/HPS meters will live skill breakdowns and session.
 
 Thanks to both authors for laying the groundwork for this extended variant.
 
