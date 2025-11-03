@@ -40,7 +40,7 @@ class Window {
                 const config = { ...this.defaultConfig, ...loadedConfig };
 
                 if (!this._isPositionVisible(config.x, config.y, config.width, config.height)) {
-                    // Si position hors écran, recentrer
+                    // Si position hors ï¿½cran, recentrer
                     config.x = undefined;
                     config.y = undefined;
                 }
@@ -99,7 +99,7 @@ class Window {
             minHeight: 42,
             transparent: true,
             frame: false,
-            title: 'BPSR-PSO-SX',
+            title: 'RiceGang Meter',
             icon: iconPath,
             autoHideMenuBar: true, // <- option correcte
             webPreferences: {
@@ -107,11 +107,11 @@ class Window {
                 contextIsolation: true,
                 nodeIntegration: false,
                 sandbox: false,
-                nativeWindowOpen: true, // <- indispensable pour que window.open crée un vrai BrowserWindow
+                nativeWindowOpen: true, // <- indispensable pour que window.open crï¿½e un vrai BrowserWindow
             },
         });
 
-        // Assigne le même preload (et mêmes flags) aux fenêtres ouvertes via window.open
+        // Assigne le mï¿½me preload (et mï¿½mes flags) aux fenï¿½tres ouvertes via window.open
         this._window.webContents.setWindowOpenHandler((_details) => {
             return {
                 action: 'allow',

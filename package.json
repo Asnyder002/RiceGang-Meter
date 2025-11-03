@@ -21,7 +21,7 @@
                     "config": {
                         "repository": {
                             "owner": "asnyder002",
-                            "name": "ricegang-meter"
+                            "name": "RiceGang-Meter"
                         },
                         "prerelease": true,
                         "draft": false
@@ -29,7 +29,7 @@
                 }
             ],
             "packagerConfig": {
-                "name": "ricegang-meter",
+                "name": "RiceGang-Meter",
                 "icon": "./resources/app.ico",
                 "asar": true,
                 "ignore": [

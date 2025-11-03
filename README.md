@@ -1,6 +1,6 @@
-# BPSR-PSO-SX (Sola Extended)
+# RiceGang Meter
 
-> A modified and extended version of BPSR-PSO built for Blue Protocol — the “SX” stands for *Sola Extended*.
+> A modified and extended overlay for Blue Protocol — forked and renamed to RiceGang Meter.
 
 ## Table of Contents
 - [About](#about)  
@@ -15,12 +15,13 @@
 - [License](#license)  
 
 ## About  
-BPSR-PSO-SX is an overlay / monitoring tool for Blue Protocol that tracks player performance metrics such as DPS/HPS on a per-second basis and provides extended functionality over the original toolset.
+RiceGang Meter is an overlay / monitoring tool for Blue Protocol that tracks player performance metrics such as DPS/HPS on a per-second basis and provides extended functionality such as stored DPS/HPS history in session.
 
 ## Origins & Acknowledgements  
 This project is based on and builds upon the work of two prior projects:  
 - [StarResonanceDamageCounter](https://github.com/dmlgzs/StarResonanceDamageCounter) — originally designed for Blue Protocol, providing DPS/HPS tracking.  
 - [BPSR-PSO](https://github.com/Chase-Simmons/BPSR-PSO.git) by Chase Simmons — a forkable version of the above, providing the base architecture for this project.
+- [BPSR-PSO](https://github.com/Sola-Ray/BPSR-PSO-SX) by Sola-Ray — extended the DPS/HPS meters will live skill breakdowns and session.
 
 Thanks to both authors for laying the groundwork for this extended variant.
 
@@ -40,13 +41,13 @@ You will need the following installed on your machine:
 
 ### Installation  
 1. Clone the repository:  
-   ```bash
-   git clone https://github.com/Sola-Ray/BPSR-PSO-SX.git
-   ```
+  ```bash
+  git clone https://github.com/asnyder002/RiceGang-Meter.git
+  ```
 2. Change into the project directory:  
-   ```bash
-   cd BPSR-PSO-SX
-   ```
+  ```bash
+  cd RiceGang-Meter
+  ```
 3. Install Node.js dependencies:  
    ```bash
    npm install
@@ -100,4 +101,4 @@ This project is licensed under the GNU Affero General Public License v3.0 (AGPL-
 
 ---
 
-Thank you for using **BPSR-PSO-SX** — happy raiding and tracking!
+Thank you for using **RiceGang Meter** — happy raiding and tracking!
