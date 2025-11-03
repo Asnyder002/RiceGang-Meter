@@ -49,6 +49,20 @@ const saveCurrentSessionIfAny = async () => {
         .map((uid) => userDataManager._buildPlayerSnapshot(uid))
         .filter(Boolean);
 
+    // build detailed per-user data (skills + attrs) so the saved session contains
+    // everything needed to rebuild spell payloads later
+    const usersDetailed = {};
+    for (const [uid, user] of savedUsers.entries()) {
+        usersDetailed[String(uid)] = {
+            uid: user.uid,
+            name: user.name,
+            profession: user.profession + (user.subProfession ? `-${user.subProfession}` : ''),
+            subProfession: user.subProfession,
+            skills: user.getSkillSummary(),
+            attr: user.attr,
+        };
+    }
+
     if (players.length === 0) {
         logger.info('[SESSION] Skipped save: no valid players.');
         return { saved: false };
@@ -67,7 +81,7 @@ const saveCurrentSessionIfAny = async () => {
         instanceId: previous.instanceId,
         fromInstance: previous.fromInstance,
         partySize: players.length,
-        snapshot: { usersAgg: snapshotUsers, players },
+        snapshot: { usersAgg: snapshotUsers, players, users: usersDetailed },
     };
 
     await Sessions.addSession(sessionToSave);
@@ -315,6 +329,81 @@ export function createApiRouter(isPausedInit, SETTINGS_PATH, LOGS_DIR) {
             res.status(500).json(JSON_ERR(e));
         }
     });
+
+    // ----------------------- SESSION PAYLOAD (historical user) ----------------
+    // Returns a payload shaped like the client-side Spells.buildSpellPayload
+    router.get(
+        '/sessions/:id/payload/:uid',
+        asyncHandler(async (req, res) => {
+            const { id } = req.params;
+            const uid = Number.parseInt(req.params.uid, 10);
+            if (!id) return res.status(400).json(JSON_ERR('Invalid session id'));
+            if (Number.isNaN(uid)) return res.status(400).json(JSON_ERR('Invalid uid'));
+
+            const sess = Sessions.getSession(id);
+            if (!sess) return res.status(404).json(JSON_ERR('Session not found'));
+
+            // Try snapshot.users first (we add that on save). Fallback to players list.
+            const snap = sess.snapshot || {};
+            const usersMap = snap.users || {};
+            const userEntry = usersMap[String(uid)] || (Array.isArray(snap.players) && snap.players.find(p => String(p.uid ?? p.id) === String(uid)));
+            if (!userEntry) return res.status(404).json(JSON_ERR('User not found in session snapshot'));
+
+            // Extract skills map (various fallback shapes)
+            const skills = userEntry.skills || userEntry.snapshot?.skills || userEntry.skillsByUser || userEntry.skills || null;
+
+            // Helper: compute classKey similarly to client
+            const getClassKey = (profession = "") => {
+                const p = String(profession).toLowerCase();
+                if (p.includes('wind')) return 'wind_knight';
+                if (p.includes('storm')) return 'stormblade';
+                if (p.includes('frost')) return 'frost_mage';
+                if (p.includes('guardian')) return 'heavy_guardian';
+                if (p.includes('shield')) return 'shield_knight';
+                if (p.includes('mark')) return 'marksman';
+                if (p.includes('soul')) return 'soul_musician';
+                if (p.includes('verdant')) return 'verdant_oracle';
+                return 'default';
+            };
+
+            // Build items array from skills map if available
+            const items = [];
+            if (skills && typeof skills === 'object') {
+                for (const [idk, d] of Object.entries(skills)) {
+                    const damage = Number(d?.totalDamage ?? d?.total_damage ?? 0) || 0;
+                    const casts = Number(d?.totalCount ?? d?.countBreakdown?.total ?? d?.totalHits ?? d?.hits ?? 0) || 0;
+                    const critHits = Number(d?.critCount ?? d?.critHits ?? 0) || 0;
+                    const hits = casts;
+                    const avg = hits > 0 ? damage / hits : 0;
+                    const critRate = hits > 0 ? (critHits / hits) * 100 : 0;
+                    items.push({
+                        id: idk,
+                        name: d?.displayName || d?.name || idk,
+                        type: String(d?.type || '').toLowerCase(),
+                        damage,
+                        casts,
+                        hits,
+                        critHits,
+                        avg,
+                        critRate,
+                        countBreakdown: d?.countBreakdown || null,
+                    });
+                }
+            }
+
+            const total = items.reduce((s, it) => s + (it.damage || 0), 0) || 1;
+            const classKey = getClassKey(userEntry.profession || userEntry.class || userEntry.professionName || '');
+
+            const payload = {
+                user: userEntry,
+                items,
+                total,
+                classKey,
+            };
+
+            res.json(JSON_OK({ data: payload }));
+        })
+    );
 
     router.delete('/sessions/:id', (req, res) => {
         try {
