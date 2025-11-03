@@ -107,6 +107,7 @@
 
     const fetchSessions = (signal) => fetchJSON("/api/sessions", signal);
     const fetchSessionDetail = (id, s) => fetchJSON(`/api/sessions/${encodeURIComponent(id)}`, s);
+    const fetchSessionPayload = (sessionId, uid, s) => fetchJSON(`/api/sessions/${encodeURIComponent(sessionId)}/payload/${encodeURIComponent(uid)}`, s);
 
     const deleteSessionById = async (id) => {
         const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(id)}`, {
@@ -419,7 +420,7 @@
             const healRatio = (p?.totals?.heal || 0) / maxHeal;
 
             return `
-<article class="player-card pc-optim cc-${classKey}" tabindex="0" aria-label="${esc(p.name)}">
+<article class="player-card pc-optim cc-${classKey}" data-uid="${esc(p.uid ?? p.id)}" tabindex="0" aria-label="${esc(p.name)}">
   <header class="pc-header">
     <div class="pc-avatar" data-role="${role}" aria-hidden="true">
       <img class="pc-class-logo" src="${esc(icon)}" alt="" loading="lazy" decoding="async">
@@ -461,6 +462,61 @@
         requestAnimationFrame(() => {
             grid.innerHTML = cardsHTML;
             grid.setAttribute("data-session-id", id);
+            // Attach click handlers to each player card so we can open details for historical users
+            try {
+                const cards = grid.querySelectorAll('.player-card');
+                for (const card of cards) {
+                    card.addEventListener('click', async (ev) => {
+                        // avoid interfering with keyboard selection focus
+                        ev.stopPropagation();
+                        const sid = grid.getAttribute('data-session-id');
+                        const uid = card.dataset.uid;
+                        if (!sid || !uid) return;
+
+                        // fetch payload from server
+                        detailAbort?.abort();
+                        detailAbort = withAbort();
+                        let payload;
+                        try {
+                            payload = await fetchSessionPayload(sid, uid, detailAbort.signal);
+                        } catch (e) {
+                            console.error('[session payload] fetch error', e);
+                            return;
+                        }
+
+                        // open details window and send the payload (handshake on details-ready)
+                        const DETAILS_URL = "../details/index.html";
+                        const NAME = "SpellDetails";
+                        let win = window.open(DETAILS_URL, NAME, "popup,width=780,height=720,menubar=0,toolbar=0,location=0,status=0,resizable=1");
+
+                        // handshake: wait for details-ready from the child, then post payload
+                        let sent = false;
+                        const send = () => {
+                            if (sent || !win || win.closed) return;
+                            try {
+                                win.postMessage({ type: 'spell-data', payload: payload }, location.origin);
+                                sent = true;
+                            } catch (err) {
+                                setTimeout(send, 120);
+                            }
+                        };
+
+                        const onReady = (ev) => {
+                            if (ev.source !== win) return;
+                            if (ev?.data?.type === 'details-ready') {
+                                window.removeEventListener('message', onReady);
+                                send();
+                            }
+                        };
+                        window.addEventListener('message', onReady);
+                        // safety send in case we miss the ready message
+                        setTimeout(send, 250);
+                    });
+                }
+            } catch (e) {
+                // non-fatal
+                console.error('[attach player-card listeners] error', e);
+            }
             requestAnimationFrame(() => {
                 grid.style.opacity = "1";
             });
