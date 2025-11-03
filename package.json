@@ -20,8 +20,8 @@
                     "name": "@electron-forge/publisher-github",
                     "config": {
                         "repository": {
-                            "owner": "Sola-Ray",
-                            "name": "BPSR-PSO-SX"
+                            "owner": "asnyder002",
+                            "name": "ricegang-meter"
                         },
                         "prerelease": true,
                         "draft": false
@@ -61,8 +61,12 @@
     },
     "keywords": [],
     "author": {
-        "name": "Sola",
-        "email": "solaraycontact@gmail.com"
+        "name": "Seotaiji",
+        "email": "asnyder002@outlook.com"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/asnyder002/ricegang-meter.git"
     },
     "license": "MIT",
     "dependencies": {
