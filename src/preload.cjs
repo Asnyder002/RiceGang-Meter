@@ -24,4 +24,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getHotkeys: () => ipcRenderer.invoke('get-hotkeys'),
     setHotkeys: (hotkeys) => ipcRenderer.invoke('set-hotkeys', hotkeys),
     onHotkeysChanged: (callback) => ipcRenderer.on('hotkeys-changed', (_e, h) => callback(h)),
+    // App version
+    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
 });

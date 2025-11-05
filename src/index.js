@@ -29,6 +29,12 @@ safeHandle('copy-image-dataurl', async (_evt, dataURL) => {
     }
 });
 
+// Expose app version to renderer
+safeHandle('get-app-version', async () => {
+    try { return app.getVersion(); } catch (e) { return '';
+    }
+});
+
 // Capture rect → dataURL
 safeHandle('capture-rect', async (evt, bounds) => {
     try {
@@ -135,6 +141,18 @@ async function initialize() {
     const mainWin = window.create();
     MAIN_WINDOW_ID = (mainWin && mainWin.id) || null;
     if (registerShortcuts) registerShortcuts();
+
+    // Persist last-seen version so the app can detect upgrades later
+    try {
+        const ver = app.getVersion && app.getVersion();
+        if (ver) {
+            window.config = window.config || {};
+            if (window.config.lastSeenVersion !== ver) {
+                window.config.lastSeenVersion = ver;
+                try { window._saveConfig && window._saveConfig(); } catch (e) { /* ignore */ }
+            }
+        }
+    } catch (e) { /* ignore */ }
 
     // IPC for hotkey config (renderer -> main)
     safeHandle('get-hotkeys', async () => {

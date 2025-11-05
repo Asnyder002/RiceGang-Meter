@@ -787,6 +787,27 @@
         Dom.opacity.addEventListener("input", (e) => setBackgroundOpacity(e.target.value));
         setBackgroundOpacity(Dom.opacity.value);
 
+        // show app version in Help panel
+        try {
+            window.electronAPI?.getAppVersion?.().then((v) => {
+                try {
+                    if (!v) return;
+                    const help = document.getElementById('helpContainer');
+                    if (!help) return;
+                    let verEl = help.querySelector('.help-version');
+                    if (!verEl) {
+                        verEl = document.createElement('p');
+                        verEl.className = 'help-version';
+                        verEl.style.marginTop = '10px';
+                        verEl.style.fontSize = '12px';
+                        verEl.style.color = 'rgba(200,200,200,0.9)';
+                        help.appendChild(verEl);
+                    }
+                    verEl.textContent = `Version: ${v}`;
+                } catch (e) { /* ignore UI errors */ }
+            }).catch(() => {});
+        } catch (e) { /* noop */ }
+
         // Electron passthrough
         window.electronAPI?.onTogglePassthrough?.((isIgnoring) => {
             Dom.allButtons.forEach((btn) => btn.classList.toggle("hidden", isIgnoring));
