@@ -43,6 +43,19 @@
                     <label for="opacitySlider">Background Opacity</label>
                     <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="0.05" />
                 </div>
+                <div class="settings-option">
+                    <label for="pauseHotkeyInput">Pause Hotkey</label>
+                    <!-- readonly: users assign via the "Press any key" modal -->
+                    <input id="pauseHotkeyInput" type="text" placeholder="e.g. PageUp or Control+Shift+P" readonly />
+                </div>
+                <div class="settings-option">
+                    <label for="clearHotkeyInput">Clear Hotkey</label>
+                    <input id="clearHotkeyInput" type="text" placeholder="e.g. PageDown or Control+Shift+C" readonly />
+                </div>
+                <div class="settings-actions">
+                    <button id="saveHotkeys">Save Hotkeys</button>
+                    <button id="restoreHotkeys">Restore Defaults</button>
+                </div>
             </div>
 
             <div id="helpContainer" class="help-container hidden">
@@ -52,7 +65,10 @@
                     <li><strong>Minimize Window Content:</strong><br /><code>Control+Alt+Z</code></li>
                     <li><strong>Resize Window:</strong><br /><code>Control + Arrow Keys</code></li>
                     <li><strong>Move Window:</strong><br /><code>Control + Alt + Arrow Keys</code></li>
+                    <li><strong>Clear Data (global):</strong><br /><code>PageDown</code> — Clears current session data (works even when another window is focused).</li>
+                    <li><strong>Toggle Pause/Resume (global):</strong><br /><code>PageUp</code> — Pause or resume live updates (works even when another window is focused).</li>
                 </ul>
+                <p class="help-note">Tip: open the <strong>Settings</strong> (⚙️) to adjust <em>Background Opacity</em> using the slider if you prefer a more transparent overlay.</p>
             </div>
         </div>
     </div>
@@ -89,6 +105,19 @@
         <div class="popup-footer">
             <span id="spellFooter">—</span>
         </div>
+    </div>
+
+    <!-- Key capture modal (shown when assigning hotkeys) -->
+    <div id="keyCaptureModal" class="key-capture hidden" role="dialog" aria-modal="true">
+        <div class="key-capture-box">
+            <div class="kc-message">Press any key to assign...</div>
+            <div class="kc-hint">Press Esc to cancel</div>
+        </div>
+    </div>
+
+    <!-- Notification bubble (bottom center) -->
+    <div id="notification" class="notification hidden" aria-live="polite" aria-atomic="true">
+        <div class="notification-msg">&nbsp;</div>
     </div>
 
     <script src="script.js"></script>

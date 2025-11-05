@@ -102,3 +102,19 @@ This project is licensed under the GNU Affero General Public License v3.0 (AGPL-
 ---
 
 Thank you for using **RiceGang Meter** — happy raiding and tracking!
+
+## Keyboard Shortcuts
+
+RiceGang Meter supports several global and in-window keyboard shortcuts. Global shortcuts work even when the overlay is not focused.
+
+- Toggle Mouse Pass-through: Control+`
+- Minimize/Restore window height: Control+Alt+Z
+- Resize window: Control + Arrow Keys
+- Move window: Control + Alt + Arrow Keys
+- Clear Data (global): PageDown — Clears the current session data and resets the overlay.
+- Toggle Pause/Resume (global): PageUp — Pause or resume live updates.
+
+Settings → Background Opacity
+- You can manually set the overlay background opacity from the in-app Settings (click the ⚙️ button). Use the "Background Opacity" slider to adjust transparency to your preference.
+
+If you want to change these bindings, edit `src/client/shortcuts.js` and restart the application.

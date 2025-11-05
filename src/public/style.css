@@ -273,6 +273,123 @@ body {
     min-height: 25px;
 }
 
+/* === Settings panel styling === */
+.settings-container {
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* vertical spacing between rows */
+}
+
+/* make settings scrollable and size to available space inside the main container
+   Use calc(100% - X) so it adapts as the window is resized instead of a fixed
+   viewport height which caused strange extra padding when dragging. */
+.settings-container {
+    /* fill remaining vertical space in the main container so the scroll area
+       matches the visible panel. min-height:0 is necessary for flex children
+       so the overflow can work correctly on some browsers. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+}
+
+.settings-option {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 4px 0; /* small vertical spacing to breathe */
+    flex: 0 0 auto; /* prevent options from stretching when window resizes */
+}
+
+.settings-option label {
+    font-size: 12px;
+    color: rgba(230,230,230,0.9);
+}
+
+.settings-option input[type="text"],
+.settings-option input[type="range"] {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 6px;
+    outline: none;
+    font-size: 12px;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.settings-option input[type="text"]::placeholder {
+    color: rgba(255,255,255,0.55);
+}
+
+.settings-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 6px;
+    align-self: flex-start; /* keep actions compact, don't stretch */
+}
+
+.settings-actions button {
+    padding: 4px 8px; /* smaller buttons */
+    font-size: 11px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    min-width: 80px;
+}
+
+.settings-actions button:hover {
+    background: rgba(255,255,255,0.12);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    transform: translateY(-1px);
+}
+
+/* Save button - blue/turquoise style to match the opacity slider */
+#saveHotkeys {
+    background: linear-gradient(90deg, #2ad1c9, #00a6de);
+    border: 1px solid rgba(0,160,220,0.25);
+    color: #062029;
+    box-shadow: 0 4px 10px rgba(0,160,220,0.12);
+}
+
+#saveHotkeys:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(0,160,220,0.18);
+    filter: brightness(1.03);
+}
+
+/* Keep restore neutral but slightly muted */
+#restoreHotkeys {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #e8e8e8;
+}
+
+/* scrollbar styling for settings panel */
+.settings-container::-webkit-scrollbar {
+    width: 8px;
+}
+.settings-container::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.08);
+    border-radius: 4px;
+}
+.settings-container::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.18);
+    border-radius: 4px;
+}
+
+.help-note {
+    margin-top: 8px;
+    color: rgba(220,220,220,0.85);
+    font-size: 12px;
+}
+
 /* === Button Styles for Controls (Adjusted Padding) === */
 .button-group {
     display: flex;
@@ -592,3 +709,80 @@ li::marker {
         display: block;
         pointer-events: none;
     }
+
+    /* Key capture modal (centered small popup) */
+    .key-capture {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.35);
+        z-index: 10001;
+    }
+
+    .key-capture.hidden {
+        display: none !important;
+    }
+
+    .key-capture-box {
+        background: rgba(18,20,22,0.95);
+        color: #fff;
+        padding: 18px 22px;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        text-align: center;
+        min-width: 280px;
+        max-width: 420px;
+        border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .kc-message {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+
+    .kc-hint {
+        font-size: 12px;
+        color: rgba(255,255,255,0.7);
+    }
+
+    /* Make readonly inputs look interactive */
+    input[readonly] {
+        cursor: pointer;
+    }
+
+    /* Notification bubble (bottom center) */
+    .notification {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%) translateY(12px);
+        background: linear-gradient(180deg, rgba(6,32,40,0.98), rgba(4,22,28,0.98));
+        color: #dff8f5;
+        padding: 10px 16px;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+        border: 1px solid rgba(0,200,220,0.08);
+        z-index: 12000;
+        min-width: 220px;
+        max-width: 84%;
+        text-align: center;
+        opacity: 0;
+        transition: opacity 220ms ease, transform 220ms ease;
+        pointer-events: none;
+    }
+
+    .notification .notification-msg {
+        font-weight: 700;
+        font-size: 13px;
+    }
+
+    .notification.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+        pointer-events: auto;
+    }
+
+    .notification.hidden { display: none !important; }

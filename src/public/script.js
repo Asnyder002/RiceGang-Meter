@@ -574,9 +574,15 @@
             State.paused = !State.paused;
             Dom.pauseBtn.textContent = State.paused ? "Resume" : "Pause";
             setServerStatus(State.paused ? "paused" : "connected");
+            try {
+                if (State.paused) showNotification('Paused', 2000);
+                else showNotification('Resumed', 1400);
+            } catch (e) { }
         },
 
         async clearData() {
+            // show sticky notification while clearing/saving
+            try { showNotification && showNotification('Clearing and saving session data...', 0); } catch (e) { }
             try {
                 const prev = getServerStatus();
                 setServerStatus("cleared");
@@ -592,14 +598,18 @@
                     UI.resetSpellPopup();
                     Spells.closeWindowIfAny();
                     //console.log("Data cleared successfully.");
+                    // replace sticky message with success
+                    try { showNotification && showNotification('Cleared', 2000); } catch (e) { }
                 } else {
                     console.error("Failed to clear data:", result.msg);
+                    try { showNotification && showNotification('Clear failed', 3000); } catch (e) { }
                 }
 
                 setTimeout(() => setServerStatus(prev), 1000);
             } catch (err) {
                 console.error("Clear error:", err);
                 setServerStatus("disconnected");
+                try { showNotification && showNotification('Clear failed', 3000); } catch (e) { }
             }
         },
 
@@ -651,6 +661,40 @@
         },
     };
 
+    // -------------------- Notifications (bottom bubble) --------------------
+    let __notifTimer = null;
+    function _getNotifEls() {
+        const el = document.getElementById('notification');
+        const msg = el ? el.querySelector('.notification-msg') : null;
+        return { el, msg };
+    }
+
+    function showNotification(text, duration = 3000) {
+        const { el, msg } = _getNotifEls();
+        if (!el || !msg) return;
+        // ensure visible (remove hidden), set message
+        msg.textContent = text || '';
+        el.classList.remove('hidden');
+        // small delay to allow CSS to reflow then add show class
+        requestAnimationFrame(() => el.classList.add('show'));
+
+        if (__notifTimer) { clearTimeout(__notifTimer); __notifTimer = null; }
+        if (duration && duration > 0) {
+            __notifTimer = setTimeout(() => {
+                hideNotification();
+            }, duration);
+        }
+    }
+
+    function hideNotification() {
+        const { el } = _getNotifEls();
+        if (!el) return;
+        el.classList.remove('show');
+        if (__notifTimer) { clearTimeout(__notifTimer); __notifTimer = null; }
+        // after transition, hide completely to remove from accessibility tree
+        setTimeout(() => { try { el.classList.add('hidden'); } catch (e) { } }, 260);
+    }
+
     // ==========================================================================
     // 10) WebSocket layer
     //     DIP: dépendance à io() injectée via global window.io disponible.
@@ -692,12 +736,14 @@
             });
 
             State.socket.on('session_started', (data) => {
+                try { showNotification('Loading New Instance', 1600); } catch (e) { }
                 setServerStatus('cleared');
                 State.users = {};
                 Renderer.renderDataList([], State.activeTab);
             });
 
             State.socket.on('session_changed', (data) => {
+                try { showNotification('Loading New Instance', 1600); } catch (e) { }
                 setServerStatus('cleared');
                 State.users = {};
                 Renderer.renderDataList([], State.activeTab);
@@ -750,6 +796,185 @@
             Dom.help.classList.add("hidden");
         });
 
+        // Global shortcuts: Clear and Toggle Pause (from main process globalShortcut)
+        window.electronAPI?.onGlobalClear?.(() => {
+            try { UI.clearData(); } catch (e) { console.error('Failed to handle global clear', e); }
+        });
+
+        window.electronAPI?.onGlobalTogglePause?.(() => {
+            try { UI.togglePause(); } catch (e) { console.error('Failed to handle global toggle pause', e); }
+        });
+
+        // Hotkeys settings UI wiring
+        const pauseInput = document.getElementById('pauseHotkeyInput');
+        const clearInput = document.getElementById('clearHotkeyInput');
+        const saveBtn = document.getElementById('saveHotkeys');
+        const restoreBtn = document.getElementById('restoreHotkeys');
+
+        function populateHotkeyInputs(hk) {
+            try {
+                const pause = (hk && hk.pause) || (window.__initialHotkeys && window.__initialHotkeys.pause) || 'PageUp';
+                const clear = (hk && hk.clear) || (window.__initialHotkeys && window.__initialHotkeys.clear) || 'PageDown';
+                if (pauseInput) pauseInput.value = pause;
+                if (clearInput) clearInput.value = clear;
+            } catch (e) { /* ignore */ }
+        }
+
+        // Load current hotkeys from main
+        try {
+            window.electronAPI?.getHotkeys?.().then((hk) => {
+                populateHotkeyInputs(hk || {});
+                // cache
+                window.__initialHotkeys = hk || {};
+            }).catch(() => populateHotkeyInputs(null));
+        } catch (e) { populateHotkeyInputs(null); }
+
+        // Save handler
+        if (saveBtn) saveBtn.addEventListener('click', async () => {
+            const newPause = pauseInput?.value?.trim() || '';
+            const newClear = clearInput?.value?.trim() || '';
+            try {
+                await window.electronAPI?.setHotkeys?.({ pause: newPause, clear: newClear });
+                try { showNotification('Settings Updated!', 1800); } catch (e) { }
+            } catch (err) {
+                console.error('Failed to save hotkeys', err);
+                try { showNotification('Save failed', 2500); } catch (e) { }
+            }
+        });
+
+        // Restore defaults
+        if (restoreBtn) restoreBtn.addEventListener('click', async () => {
+            try {
+                await window.electronAPI?.setHotkeys?.({ pause: 'PageUp', clear: 'PageDown' });
+                try { showNotification('Defaults restored', 1400); } catch (e) { }
+            } catch (err) { console.error('Failed to restore hotkeys', err); try { showNotification('Restore failed', 2500); } catch (e) { } }
+        });
+
+        // Update UI when hotkeys change elsewhere
+        window.electronAPI?.onHotkeysChanged?.((hk) => {
+            populateHotkeyInputs(hk || {});
+        });
+
+        // --- Key capture modal for assigning hotkeys (click input -> press any key) ---
+        const keyModal = document.getElementById('keyCaptureModal');
+        let keyCaptureTarget = null;
+
+        function formatAcceleratorFromEvent(ev) {
+            // Ignore pure modifier key presses until user presses a non-mod key.
+            if (!ev || !ev.key) return null;
+            const key = ev.key;
+            if (['Shift', 'Control', 'Alt', 'Meta'].includes(key)) return null;
+
+            const parts = [];
+            if (ev.ctrlKey) parts.push('Control');
+            if (ev.metaKey) parts.push('Meta');
+            if (ev.altKey) parts.push('Alt');
+            if (ev.shiftKey) parts.push('Shift');
+
+            let main = key;
+            if (main === ' ') main = 'Space';
+            // Normalize single char to uppercase
+            if (main.length === 1) main = main.toUpperCase();
+
+            parts.push(main);
+            return parts.join('+');
+        }
+
+        function keyCaptureHandler(ev) {
+            try {
+                ev.preventDefault();
+                ev.stopPropagation();
+            } catch (e) { }
+
+            if (!keyCaptureTarget) return closeKeyCapture();
+            if (ev.key === 'Escape') return closeKeyCapture();
+
+            const accel = formatAcceleratorFromEvent(ev);
+            if (!accel) {
+                // Wait for a non-modifier key
+                return;
+            }
+
+            // Put the captured accelerator in the input (but DO NOT save yet)
+            keyCaptureTarget.value = accel;
+            closeKeyCapture();
+        }
+
+        function openKeyCapture(inputEl) {
+            if (!inputEl || !keyModal) return;
+            keyCaptureTarget = inputEl;
+            keyModal.classList.remove('hidden');
+            // small delay to ensure modal painted before listening
+            setTimeout(() => document.addEventListener('keydown', keyCaptureHandler, { capture: true }), 10);
+        }
+
+        function closeKeyCapture() {
+            if (keyModal) keyModal.classList.add('hidden');
+            try { document.removeEventListener('keydown', keyCaptureHandler, { capture: true }); } catch (e) { }
+            keyCaptureTarget = null;
+        }
+
+        // Attach click handlers to the hotkey inputs so clicks open the capture modal
+        try {
+            if (pauseInput) pauseInput.addEventListener('click', () => openKeyCapture(pauseInput));
+            if (clearInput) clearInput.addEventListener('click', () => openKeyCapture(clearInput));
+            // also allow clicking the modal overlay to cancel
+            if (keyModal) keyModal.addEventListener('click', (ev) => {
+                if (ev.target === keyModal) closeKeyCapture();
+            });
+        } catch (e) { /* ignore attach errors */ }
+
+        // Hotkeys Settings UI
+        (async function setupHotkeysUI() {
+            const pauseInput = document.getElementById('pauseHotkeyInput');
+            const clearInput = document.getElementById('clearHotkeyInput');
+            const saveBtn = document.getElementById('saveHotkeysBtn');
+            const restoreBtn = document.getElementById('restoreHotkeysBtn');
+            const statusEl = document.getElementById('hotkeysStatus');
+
+            async function load() {
+                try {
+                    const h = await (window.electronAPI?.getHotkeys?.() ?? Promise.resolve({}));
+                    if (pauseInput) pauseInput.value = h.pause || '';
+                    if (clearInput) clearInput.value = h.clear || '';
+                } catch (e) { console.error('Failed to load hotkeys', e); }
+            }
+
+            function showStatus(txt, timeout = 2000) {
+                if (!statusEl) return;
+                statusEl.textContent = txt;
+                setTimeout(() => { statusEl.textContent = ''; }, timeout);
+            }
+
+            if (saveBtn) saveBtn.addEventListener('click', async () => {
+                const pauseVal = pauseInput?.value?.trim() || '';
+                const clearVal = clearInput?.value?.trim() || '';
+                try {
+                    await window.electronAPI?.setHotkeys?.({ pause: pauseVal, clear: clearVal });
+                    showStatus('Hotkeys saved');
+                } catch (e) {
+                    console.error('Failed to save hotkeys', e);
+                    showStatus('Save failed');
+                }
+            });
+
+            if (restoreBtn) restoreBtn.addEventListener('click', async () => {
+                try {
+                    // restore defaults: PageUp/PageDown
+                    await window.electronAPI?.setHotkeys?.({ pause: 'PageUp', clear: 'PageDown' });
+                    await load();
+                    showStatus('Defaults restored');
+                } catch (e) { console.error('Failed to restore defaults', e); showStatus('Restore failed'); }
+            });
+
+            // listen for runtime changes
+            window.electronAPI?.onHotkeysChanged?.((h) => {
+                if (pauseInput && h.pause) pauseInput.value = h.pause;
+                if (clearInput && h.clear) clearInput.value = h.clear;
+            });
+
+            await load();
+        })();
         document.getElementById("closePopupButton")?.addEventListener("click", UI.closePopup);
     }
 
