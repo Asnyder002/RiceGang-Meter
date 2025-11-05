@@ -582,7 +582,6 @@
 
         async clearData() {
             // show sticky notification while clearing/saving
-            try { showNotification && showNotification('Clearing and saving session data...', 0); } catch (e) { }
             try {
                 const prev = getServerStatus();
                 setServerStatus("cleared");
@@ -793,17 +792,28 @@
                 try {
                     if (!v) return;
                     const help = document.getElementById('helpContainer');
-                    if (!help) return;
-                    let verEl = help.querySelector('.help-version');
-                    if (!verEl) {
-                        verEl = document.createElement('p');
-                        verEl.className = 'help-version';
-                        verEl.style.marginTop = '10px';
-                        verEl.style.fontSize = '12px';
-                        verEl.style.color = 'rgba(200,200,200,0.9)';
-                        help.appendChild(verEl);
+                    if (help) {
+                        let verEl = help.querySelector('.help-version');
+                        if (!verEl) {
+                            verEl = document.createElement('p');
+                            verEl.className = 'help-version';
+                            verEl.style.marginTop = '10px';
+                            verEl.style.fontSize = '12px';
+                            verEl.style.color = 'rgba(200,200,200,0.9)';
+                            help.appendChild(verEl);
+                        }
+                        verEl.textContent = `Version: ${v}`;
                     }
-                    verEl.textContent = `Version: ${v}`;
+
+                    // append version to the app title string so it appears on the same line
+                    const appTitleEl = document.querySelector('.app-title');
+                    if (appTitleEl) {
+                        // keep original title text if present, then append version
+                        const base = (appTitleEl.dataset.baseTitle || appTitleEl.textContent || 'RiceGang Meter').trim();
+                        appTitleEl.dataset.baseTitle = base;
+                        appTitleEl.textContent = `${base} v${v}`;
+                        appTitleEl.title = `Version ${v}`;
+                    }
                 } catch (e) { /* ignore UI errors */ }
             }).catch(() => {});
         } catch (e) { /* noop */ }

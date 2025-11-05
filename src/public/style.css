@@ -273,6 +273,29 @@ body {
     min-height: 25px;
 }
 
+.title-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.app-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: #fff;
+}
+
+.app-version {
+    font-size: 11px;
+    color: rgba(200,200,200,0.75);
+    font-weight: 600;
+    margin-left: 6px;
+}
+
+/* Make sure version is visible and doesn't collapse; keep it aligned vertically */
+.title-container { min-width: 120px; }
+.app-version { display: inline-block; line-height: 1; padding-top: 1px; color: rgba(230,230,230,0.85); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* === Settings panel styling === */
 .settings-container {
     padding: 8px 12px;
@@ -402,64 +425,116 @@ body {
     gap: 6px; /* espace horizontal entre boutons */
     -webkit-app-region: no-drag;
 }
-
+    /* Modernized control buttons: pill-shaped, subtle depth, smoother hover */
     .button-group button {
         -webkit-app-region: no-drag;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+        border: 1px solid rgba(255,255,255,0.06);
         color: #fff;
         font-size: 12px;
         font-weight: 600;
-        padding: 6px 10px; /* padding uniforme pour tous les boutons */
-        border-radius: 6px;
+        padding: 6px 12px;
+        border-radius: 10px;
         cursor: pointer;
-        backdrop-filter: blur(5px);
-        -webkit-backdrop-filter: blur(5px);
-        transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
-        display: flex;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        transition: background 0.12s ease, box-shadow 0.12s ease;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 28px;
+        min-width: 0;
+        gap: 8px;
+        line-height: 1;
     }
 
-        /* Icon buttons (help/settings/close) - padding harmonisé */
-        .button-group button#helpButton,
-        .button-group button#settingsButton,
-        .button-group button#closeButton {
-            padding: 6px 10px; /* même que les autres pour uniformité */
-            font-size: 14px;
-            min-width: 28px;
-        }
+    /* Compact desktop icon controls */
+    .button-group button#helpButton,
+    .button-group button#settingsButton,
+    .button-group button#closeButton,
+    .button-group button#btnOpenSessions {
+        height: 28px;
+        padding: 4px 8px;
+        border-radius: 6px; /* small, desktop-friendly radius */
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+    }
 
-        /* Hover Effect */
-        .button-group button:hover {
-            background: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            transform: translateY(-1px);
-        }
+    /* Make non-close icon buttons match Clear/Pause text color so icons feel cohesive */
+    .button-group button#btnOpenSessions,
+    .button-group button#helpButton,
+    .button-group button#settingsButton {
+        color: #eafafc;
+    }
 
-        /* Active / Clicked Effect */
-        .button-group button:active {
-            transform: translateY(0);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-        }
+    /* Emphasize primary actions slightly (Clear/Pause) */
+    .button-group button#clearButton,
+    .button-group button#pauseButton {
+        background: linear-gradient(180deg, rgba(42,209,201,0.12), rgba(0,166,222,0.06));
+        border: 1px solid rgba(0,160,220,0.12);
+        color: #eafafc;
+        padding: 6px 12px;
+    }
 
-        /* Disabled state */
-        .button-group button.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
+    /* Unified desktop hover: stronger, visible highlight using the turquoise accent.
+       Keeps interactions consistent across Clear/Pause/Sessions/Help/Settings. */
+    .button-group button:hover {
+        transform: none;
+        box-shadow: none;
+        background: rgba(0,160,220,0.10); /* visible but subtle turquoise */
+        border-color: rgba(0,160,220,0.24);
+        color: #eafafc;
+    }
 
-/* Close button styling */
+    .button-group button:active {
+        transform: none;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.16);
+        background: rgba(255,255,255,0.08);
+    }
+
+    .button-group button.disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        pointer-events: none;
+        transform: none;
+    }
+
+    /* Icon sizing and color for SVG icons inside buttons */
+    .button-group button .icon {
+        width: 14px;
+        height: 14px;
+        display: block;
+        color: inherit; /* inherit so icon color follows button text color on hover */
+    }
+
+    /* Hide any leftover text inside icon-only buttons */
+    .button-group button[aria-label] {
+        color: inherit; /* keep icon color visible */
+        font-size: 0; /* hide textual label while preserving SVG sizing */
+        line-height: 0;
+    }
+
+    /* Ensure accessible focus ring for keyboard users */
+    .button-group button:focus {
+        outline: 2px solid rgba(42, 209, 201, 0.35);
+        outline-offset: 2px;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.36);
+    }
+
+/* Close button styling: neutral by default, red highlight on hover */
 #closeButton {
-    background-color: rgba(255, 0, 0, 0.4);
-    border-color: rgba(255, 0, 0, 0.6);
+    background-color: transparent;
+    border-color: rgba(255, 0, 0, 0.12);
+    color: #fff;
 }
 
     #closeButton:hover {
-        background-color: rgba(255, 0, 0, 0.6);
-        box-shadow: 0 0 8px rgba(255,0,0,0.5);
+        background-color: rgba(255, 60, 60, 0.18);
+        border-color: rgba(255, 60, 60, 0.38);
+        box-shadow: 0 6px 18px rgba(255,60,60,0.12);
+        color: #fff;
     }
 
 .tabs {
