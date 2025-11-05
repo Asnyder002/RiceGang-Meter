@@ -7,7 +7,7 @@
     "scripts": {
         "start": "electron-forge start",
         "package": "electron-forge package",
-        "make": "electron-forge make",
+    "make": "node ./scripts/make-with-version.js",
         "publish": "electron-forge publish",
         "lint": "echo \"No linting configured\"",
         "format": "prettier --write \"**/*.{js,json,html}\"",
