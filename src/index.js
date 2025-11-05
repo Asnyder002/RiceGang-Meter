@@ -136,6 +136,39 @@ async function initialize() {
     MAIN_WINDOW_ID = (mainWin && mainWin.id) || null;
     if (registerShortcuts) registerShortcuts();
 
+    // IPC for hotkey config (renderer -> main)
+    safeHandle('get-hotkeys', async () => {
+        try {
+            if (shortcuts && shortcuts.getHotkeys) return shortcuts.getHotkeys();
+            return {};
+        } catch (e) { return {}; }
+    });
+
+    safeHandle('set-hotkeys', async (_evt, hotkeys) => {
+        try {
+            // persist into window config and save
+            window.config = window.config || {};
+            window.config.hotkeys = Object.assign({}, window.config.hotkeys || {}, hotkeys || {});
+            try { window._saveConfig(); } catch (e) { /* ignore */ }
+
+            // update runtime shortcuts
+            try { if (shortcuts && shortcuts.setHotkeys) shortcuts.setHotkeys(window.config.hotkeys); } catch (e) { console.error('Failed to setHotkeys', e); }
+
+            // notify all renderer windows of the change
+            try {
+                const all = BrowserWindow.getAllWindows();
+                for (const w of all) {
+                    try { w.webContents.send('hotkeys-changed', window.config.hotkeys); } catch {}
+                }
+            } catch (e) { /* ignore */ }
+
+            return window.config.hotkeys;
+        } catch (err) {
+            console.error('set-hotkeys failed', err);
+            return {};
+        }
+    });
+
     // -------- chemins runtime (DEV vs .EXE) --------
     const isPackaged = app.isPackaged;
     const userDataDir = app.getPath('userData'); // dossier RW

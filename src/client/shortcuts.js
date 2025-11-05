@@ -4,14 +4,25 @@ import window from './Window.js';
 const RESIZE_INCREMENT = 20;
 const MOVE_INCREMENT = 20;
 
+// Default accelerator bindings (can be overridden via settings)
+const DEFAULT_HOTKEYS = {
+    pause: 'PageUp',
+    clear: 'PageDown',
+};
+
+let currentHotkeys = { ...DEFAULT_HOTKEYS };
+
 /**
  * Registers all global keyboard shortcuts for the application.
  */
 export function registerShortcuts() {
+    // Register core shortcuts
     registerPassthrough();
     registerResize();
     registerMove();
     registerMinimize();
+    // Register clear/pause using configured hotkeys
+    registerClearPause();
 }
 
 /**
@@ -82,4 +93,56 @@ function registerMinimize() {
     globalShortcut.register('Control+Alt+Z', () => {
         window.minimizeOrRestore();
     });
+}
+
+/**
+ * Registers shortcuts for global Clear and Pause actions.
+ * These send IPC messages to the renderer so the actions run even when
+ * another window is focused.
+ */
+function registerClearPause() {
+    try {
+        // unregister previous if any
+        try { globalShortcut.unregister(currentHotkeys.clear); } catch {}
+        try { globalShortcut.unregister(currentHotkeys.pause); } catch {}
+
+        const cfg = window.config && window.config.hotkeys ? window.config.hotkeys : {};
+        const clearAccel = cfg.clear || currentHotkeys.clear || DEFAULT_HOTKEYS.clear;
+        const pauseAccel = cfg.pause || currentHotkeys.pause || DEFAULT_HOTKEYS.pause;
+
+        if (clearAccel) {
+            globalShortcut.register(clearAccel, () => {
+                try {
+                    const bw = window.getWindow?.();
+                    if (bw && bw.webContents) bw.webContents.send('global-clear');
+                } catch (e) { /* swallow */ }
+            });
+        }
+
+        if (pauseAccel) {
+            globalShortcut.register(pauseAccel, () => {
+                try {
+                    const bw = window.getWindow?.();
+                    if (bw && bw.webContents) bw.webContents.send('global-toggle-pause');
+                } catch (e) { /* swallow */ }
+            });
+        }
+    } catch (err) {
+        // globalShortcut.register may throw if not allowed on platform; ignore
+        console.error('Failed to register clear/pause shortcuts', err);
+    }
+}
+
+/** Replace current hotkeys and re-register clear/pause */
+export function setHotkeys(hotkeys = {}) {
+    currentHotkeys = { ...currentHotkeys, ...hotkeys };
+    registerClearPause();
+}
+
+export function getHotkeys() {
+    const cfg = window.config && window.config.hotkeys ? window.config.hotkeys : {};
+    return {
+        pause: cfg.pause || currentHotkeys.pause,
+        clear: cfg.clear || currentHotkeys.clear,
+    };
 }

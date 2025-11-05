@@ -25,6 +25,11 @@ class Window {
         y: undefined,
         passthrough: false,
         lastHeight: 300, // Default restore height for minimize feature
+        // hotkeys persisted here (can be changed from the Settings UI)
+        hotkeys: {
+            pause: 'PageUp',
+            clear: 'PageDown'
+        }
     };
 
     constructor() {
@@ -64,6 +69,7 @@ class Window {
                 y: bounds.y,
                 passthrough: this.config.passthrough,
                 lastHeight: this.config.lastHeight,
+                hotkeys: this.config.hotkeys || this.defaultConfig.hotkeys,
             };
             fs.writeFileSync(configPath, JSON.stringify(configData, null, 4));
         } catch (error) {
