@@ -4,30 +4,39 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
     packagerConfig: {
         name: 'RiceGang-Meter',
-        icon: './resources/ico',
+        icon: './resources/app.ico',
         asar: true,
-        extraResource: ['./resources/npcap-1.83.exe'],
+        ignore: [
+            /^\/node_modules\/cap\/build/,
+        ],
+        afterCopy: [
+            (buildPath, electronVersion, platform, arch, callback) => {
+                // Ensure native modules are properly handled
+                callback();
+            }
+        ]
     },
     rebuildConfig: {},
     makers: [
         {
             name: '@electron-forge/maker-squirrel',
             config: {
-                setupIcon: './resources/icon.ico',
+                setupIcon: './resources/app.ico',
             },
         },
+    ],
+    publishers: [
         {
-            name: '@electron-forge/maker-zip',
-            platforms: ['darwin'],
-        },
-        {
-            name: '@electron-forge/maker-deb',
-            config: {},
-        },
-        {
-            name: '@electron-forge/maker-rpm',
-            config: {},
-        },
+            name: '@electron-forge/publisher-github',
+            config: {
+                repository: {
+                    owner: 'asnyder002',
+                    name: 'RiceGang-Meter'
+                },
+                prerelease: true,
+                draft: false
+            }
+        }
     ],
     plugins: [
         {

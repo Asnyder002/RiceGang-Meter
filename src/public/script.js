@@ -69,6 +69,10 @@
         spellWindowRef: /** @type {Window|null} */ (null),
         currentSpellUserId: /** @type {string|null} */ (null),
         spellWindowWatchdog: /** @type {number|null} */ (null),
+        // live skills view state
+        viewMode: "main", // "main" or "live-skills"
+        liveSkillsUserId: /** @type {string|null} */ (null),
+        liveSkillsUserName: /** @type {string|null} */ (null),
     };
 
     window.__sessionStartTs ??= null;
@@ -234,6 +238,11 @@
     const Renderer = {
         /** Met à jour l’UI à partir d’un tableau d’utilisateurs. */
         renderDataList(users, activeTab) {
+            if (State.viewMode === "live-skills") {
+                this.renderLiveSkillsView();
+                return;
+            }
+            
             if (State.renderPending) return;
             State.renderPending = true;
 
@@ -297,6 +306,12 @@
                         li.querySelector(".spell-btn").addEventListener("click", (e) => {
                             e.stopPropagation();
                             UI.showPopupForUser(uid);
+                        });
+                        // Add right-click context menu for live skills view (works on all tabs)
+                        li.addEventListener("contextmenu", (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            UI.showLiveSkillsForUser(uid, user.name);
                         });
                         Dom.columns.appendChild(li);
                     } else {
@@ -389,6 +404,404 @@
                     }
                 });
             });
+        },
+
+        renderLiveSkillsView() {
+            if (State.renderPending) return;
+            State.renderPending = true;
+
+            requestAnimationFrame(() => {
+                State.renderPending = false;
+                
+                const userId = State.liveSkillsUserId;
+                const userName = State.liveSkillsUserName;
+                
+                if (!userId || !userName) {
+                    // Fallback to main view if no user selected
+                    State.viewMode = "main";
+                    return;
+                }
+
+                const user = State.users[userId];
+                const skillsData = State.skillsByUser[userId];
+                
+                // If user or skills data is no longer available, return to main view
+                if (!user || !skillsData) {
+                    State.viewMode = "main";
+                    State.liveSkillsUserId = null;
+                    State.liveSkillsUserName = null;
+                    this.renderMain();
+                    return;
+                }
+                
+                // Check if the live skills container already exists
+                let container = Dom.columns.querySelector('.live-skills-container');
+                
+                if (!container) {
+                    // Clear existing content and create new container
+                    Dom.columns.innerHTML = '';
+                    
+                    container = document.createElement('div');
+                    container.className = 'live-skills-container';
+                    container.innerHTML = `
+                        <div class="live-skills-header">
+                            <button class="back-button" title="Back to Main View">
+                                <svg viewBox="0 0 24 24" width="10" height="10">
+                                    <path fill="currentColor" d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/>
+                                </svg>
+                                Back
+                            </button>
+                            <div class="header-content">
+                                <span class="player-name">${userName}</span>
+                                <div class="stats-line">
+                                    <span class="total-damage">${user ? formatNumber(valueForTab(user, State.activeTab)) : '0'}</span>
+                                    <span class="tab-label">${this.getTabLabel(State.activeTab)}</span>
+                                    <span class="separator">•</span>
+                                    <span class="dps-value">${this.calculateDPS(user)} ${this.getTabRateLabel(State.activeTab)}</span>
+                                    <span class="separator">•</span>
+                                    ${State.activeTab === CONFIG.TABS.TANK ? `
+                                        <span class="death-count">${user && user.dead_count ? user.dead_count : '0'} Deaths</span>
+                                    ` : `
+                                        <span class="crit-rate">${this.calculateOverallCritRate(user)}% Crit</span>
+                                        <span class="separator">•</span>
+                                        <span class="luck-rate">${this.calculateOverallLuckRate(user)}% Luck</span>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="skills-list" id="liveSkillsList">
+                            ${this.renderSkillsList(skillsData, user)}
+                        </div>
+                    `;
+
+                    // Add back button event listener
+                    const backButton = container.querySelector('.back-button');
+                    backButton.addEventListener('click', () => {
+                        State.viewMode = "main";
+                        State.liveSkillsUserId = null;
+                        State.liveSkillsUserName = null;
+                        // Trigger re-render of main view
+                        const users = Object.values(State.users);
+                        this.renderDataList(users, State.activeTab);
+                    });
+
+                    Dom.columns.appendChild(container);
+                } else {
+                    // Update existing container without recreating it
+                    const statsContainer = container.querySelector('.header-content');
+                    if (statsContainer) {
+                        // Rebuild the entire header content to handle tab changes
+                        statsContainer.innerHTML = `
+                            <span class="player-name">${userName}</span>
+                            <div class="stats-line">
+                                <span class="total-damage">${user ? formatNumber(valueForTab(user, State.activeTab)) : '0'}</span>
+                                <span class="tab-label">${this.getTabLabel(State.activeTab)}</span>
+                                <span class="separator">•</span>
+                                <span class="dps-value">${this.calculateDPS(user)} ${this.getTabRateLabel(State.activeTab)}</span>
+                                <span class="separator">•</span>
+                                ${State.activeTab === CONFIG.TABS.TANK ? `
+                                    <span class="death-count">${user && user.dead_count ? user.dead_count : '0'} Deaths</span>
+                                ` : `
+                                    <span class="crit-rate">${this.calculateOverallCritRate(user)}% Crit</span>
+                                    <span class="separator">•</span>
+                                    <span class="luck-rate">${this.calculateOverallLuckRate(user)}% Luck</span>
+                                `}
+                            </div>
+                        `;
+                    }
+                    
+                    // Update skills list content
+                    const skillsList = container.querySelector('#liveSkillsList');
+                    if (skillsList) {
+                        skillsList.innerHTML = this.renderSkillsList(skillsData, user);
+                    }
+                }
+            });
+        },
+
+        calculateDPS(user) {
+            if (!user) return '0';
+            
+            // Use the appropriate DPS value based on active tab
+            switch (State.activeTab) {
+                case CONFIG.TABS.DPS:
+                    return formatNumber(user.total_dps || 0);
+                case CONFIG.TABS.HEAL:
+                    return formatNumber(user.total_hps || 0);
+                case CONFIG.TABS.TANK:
+                    return formatNumber(user.taken_dps || 0);
+                default:
+                    return '0';
+            }
+        },
+
+        getTabRateLabel(activeTab) {
+            switch (activeTab) {
+                case CONFIG.TABS.DPS:
+                    return 'DPS';
+                case CONFIG.TABS.HEAL:
+                    return 'HPS';
+                case CONFIG.TABS.TANK:
+                    return 'DTPS'; // Damage Taken Per Second
+                default:
+                    return 'DPS';
+            }
+        },
+
+        getTabLabel(activeTab) {
+            switch (activeTab) {
+                case CONFIG.TABS.DPS:
+                    return 'Total Damage';
+                case CONFIG.TABS.HEAL:
+                    return 'Total Healing';
+                case CONFIG.TABS.TANK:
+                    return 'Total Damage Taken';
+                default:
+                    return 'Total';
+            }
+        },
+
+        calculateMitigationRate(user) {
+            if (!user) return '0.0';
+            
+            // Try to get mitigation percentage from user data
+            if (user.mitigation_percent !== undefined && user.mitigation_percent !== null) {
+                return user.mitigation_percent.toFixed(1);
+            }
+            
+            // Fallback calculation if needed
+            if (user.raw_taken_damage && user.taken_damage && user.raw_taken_damage > 0) {
+                const mitigationPercent = ((user.raw_taken_damage - user.taken_damage) / user.raw_taken_damage * 100);
+                return mitigationPercent.toFixed(1);
+            }
+            
+            return '0.0';
+        },
+
+        calculateOverallCritRate(user) {
+            if (!user) return '0.0';
+            
+            // Try to get from total_count if available, otherwise fall back to stats
+            let totalHits, critHits;
+            
+            if (user.total_count) {
+                totalHits = user.total_count.total || 0;
+                critHits = user.total_count.critical || 0;
+            } else if (user.stats) {
+                totalHits = user.stats.total || 0;
+                critHits = user.stats.critical || 0;
+            } else {
+                return '0.0';
+            }
+            
+            if (totalHits === 0) return '0.0';
+            return ((critHits / totalHits) * 100).toFixed(1);
+        },
+
+        calculateOverallLuckRate(user) {
+            if (!user) return '0.0';
+            
+            // Try to get from total_count if available, otherwise fall back to stats
+            let totalHits, luckHits;
+            
+            if (user.total_count) {
+                totalHits = user.total_count.total || 0;
+                luckHits = user.total_count.lucky || 0;
+            } else if (user.stats) {
+                totalHits = user.stats.total || 0;
+                luckHits = user.stats.lucky || 0;
+            } else {
+                return '0.0';
+            }
+            
+            if (totalHits === 0) return '0.0';
+            return ((luckHits / totalHits) * 100).toFixed(1);
+        },
+
+        renderSkillsList(skillsData, user) {
+            if (!skillsData || !skillsData.skills) {
+                return '<div class="no-skills">No skill data available</div>';
+            }
+
+            // For Tank tab, we want to show damage taken timeline in the future
+            // For now, show regular skills but with a note about tank-specific data
+            if (State.activeTab === CONFIG.TABS.TANK) {
+                return this.renderTankSkillsList(skillsData, user);
+            }
+
+            const merged = mergeSkills(skillsData.skills);
+            const skillsArray = Object.entries(merged)
+                .map(([id, data]) => {
+                    const totalDamage = Number(data.totalDamage ?? data.total_damage ?? 0) || 0;
+                    const totalHealing = Number(data.totalHealing ?? data.total_healing ?? 0) || 0;
+                    const hits = data.totalCount ?? data.countBreakdown?.total ?? data.totalHits ?? data.hits ?? 0;
+                    const critHits = data.critHits ?? data.critCount ?? 0;
+                    const luckHits = data.luckyCount ?? data.luckHits ?? 0;
+                    const maxHit = data.maxHit ?? 0;
+                    const critRate = hits > 0 ? ((critHits / hits) * 100).toFixed(1) : '0.0';
+                    const luckRate = hits > 0 ? ((luckHits / hits) * 100).toFixed(1) : '0.0';
+                    
+                    // For DPS tab, prioritize damage; for Heal tab, prioritize healing
+                    let primaryValue, avgValue;
+                    if (State.activeTab === CONFIG.TABS.HEAL) {
+                        primaryValue = totalHealing;
+                        avgValue = hits > 0 ? Math.round(totalHealing / hits) : 0;
+                    } else {
+                        primaryValue = totalDamage + totalHealing;
+                        avgValue = hits > 0 ? Math.round((totalDamage + totalHealing) / hits) : 0;
+                    }
+                    
+                    return {
+                        id,
+                        name: data.displayName || data.name || `Skill ${id}`,
+                        value: primaryValue,
+                        hits,
+                        critRate,
+                        luckRate,
+                        avgValue,
+                        maxHit
+                    };
+                })
+                .filter(skill => skill.value > 0)
+                .sort((a, b) => b.value - a.value);
+
+            if (skillsArray.length === 0) {
+                const tabName = State.activeTab === CONFIG.TABS.HEAL ? 'healing' : 'damage';
+                return `<div class="no-skills">No ${tabName} recorded yet</div>`;
+            }
+
+            const totalValue = skillsArray.reduce((sum, skill) => sum + skill.value, 0);
+            
+            // Get player's class color
+            const classKey = getClassKey(user?.profession);
+            const baseColor = CONFIG.CLASS_COLORS[classKey] ?? CONFIG.CLASS_COLORS.default;
+
+            return skillsArray.map(skill => {
+                const percentage = totalValue > 0 ? ((skill.value / totalValue) * 100).toFixed(1) : '0.0';
+                return `
+                    <div class="skill-item">
+                        <div class="skill-bar">
+                            <div class="skill-fill" style="width: ${percentage}%; background: linear-gradient(90deg, ${baseColor}80, ${baseColor}30);"></div>
+                            <div class="skill-content">
+                                <div class="skill-info">
+                                    <span class="skill-name">${skill.name}</span>
+                                    <span class="skill-stats">
+                                        ${formatNumber(skill.value)} (${percentage}%)
+                                    </span>
+                                </div>
+                                <div class="skill-details">
+                                    <span class="hits">${skill.hits} hits</span>
+                                    <span class="crit">${skill.critRate}% crit</span>
+                                    <span class="luck">${skill.luckRate}% luck</span>
+                                    <span class="avg">${formatNumber(skill.avgValue)} avg</span>
+                                    <span class="max">${formatNumber(skill.maxHit)} max</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        },
+
+        renderTankSkillsList(skillsData, user) {
+            // For Tank tab, show damage taken timeline instead of player's own skills
+            if (!user) {
+                return '<div class="no-skills">No user data available</div>';
+            }
+
+            const damageTakenTimeline = skillsData?.damageTakenTimeline || [];
+            
+            if (damageTakenTimeline.length === 0) {
+                return `
+                    <div class="no-skills">
+                        <div>No damage taken events in the last 60 seconds</div>
+                        <div style="font-size: 0.9em; color: #888; margin-top: 8px;">
+                            Timeline will show 1-second windows with:<br>
+                            • Damage amount and source<br>
+                            • Skill IDs that caused damage<br>
+                            • Timestamp relative to encounter start
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Get player's class color for the bars
+            const classKey = getClassKey(user?.profession);
+            const baseColor = CONFIG.CLASS_COLORS[classKey] ?? CONFIG.CLASS_COLORS.default;
+            
+            const maxDamage = Math.max(...damageTakenTimeline.map(w => w.totalEffectiveDamage));
+
+            const timelineHtml = damageTakenTimeline.map(window => {
+                const percentage = maxDamage > 0 ? ((window.totalEffectiveDamage / maxDamage) * 100).toFixed(1) : '0.0';
+                const timeText = `${window.relativeTime}s`;
+                const effectiveDamage = window.totalEffectiveDamage;
+                const rawDamage = window.totalRawDamage;
+                const sourceCount = window.events.length;
+                const sourceText = sourceCount === 1 ? "source" : "sources";
+                
+                // Check if this window contains a death event
+                const hasDeathEvent = window.events.some(event => event.isDead);
+                
+                // Determine if this was fully absorbed (immune)
+                const isFullyAbsorbed = effectiveDamage === 0 && rawDamage === 0 && sourceCount > 0;
+                
+                let absorptionText;
+                if (isFullyAbsorbed) {
+                    absorptionText = "Immune";
+                } else {
+                    // For partial or no absorption, don't show absorption details
+                    absorptionText = "";
+                }
+                
+                // Style differently for death events
+                const deathStyle = hasDeathEvent ? 
+                    'border-left: 4px solid #ff3333; background: linear-gradient(90deg, #ff333320, #ff333310);' : 
+                    '';
+                const deathIcon = hasDeathEvent ? '💀 ' : '';
+                const fillColor = hasDeathEvent ? 
+                    'linear-gradient(90deg, #ff3333, #ff333380)' : 
+                    'linear-gradient(90deg, #ff6b6b80, #ff6b6b30)';
+                
+                return `
+                    <div class="skill-item" style="${deathStyle}">
+                        <div class="skill-bar">
+                            <div class="skill-fill" style="width: ${percentage}%; background: ${fillColor};"></div>
+                            <div class="skill-content">
+                                <div class="skill-info">
+                                    <span class="skill-name">${deathIcon}${timeText} - ${formatNumber(effectiveDamage)} HP lost${hasDeathEvent ? ' (DEATH)' : ''}</span>
+                                    <span class="skill-stats">
+                                        ${absorptionText ? absorptionText + " - " : ""}${sourceCount} ${sourceText}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Add death events section if there are any deaths
+            const deathEvents = user.getRecentDeathEvents ? user.getRecentDeathEvents(5) : [];
+            
+            if (deathEvents.length > 0) {
+                const deathEventsHtml = `
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #444;">
+                        <div style="font-weight: bold; margin-bottom: 10px; color: #ff6b6b;">Recent Deaths</div>
+                        ${deathEvents.map(event => `
+                            <div class="death-event" style="background: #2a1a1a; border-left: 3px solid #ff6b6b; padding: 8px 12px; margin-bottom: 8px; border-radius: 4px;">
+                                <div style="font-size: 0.9em; color: #ff6b6b; font-weight: bold;">
+                                    ${event.relativeTime}s ago
+                                </div>
+                                <div style="font-size: 0.85em; color: #ccc; margin-top: 2px;">
+                                    ${event.attackerName || 'Unknown attacker'}${event.damage > 0 ? ` • ${formatNumber(event.damage)} damage` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                return timelineHtml + deathEventsHtml;
+            }
+            
+            return timelineHtml;
         },
     };
 
@@ -655,6 +1068,20 @@
             console.warn("Popup inline non utilisé (OPEN_SPELLS_IN_WINDOW=false).");
         },
 
+        showLiveSkillsForUser(userId, userName) {
+            State.viewMode = "live-skills";
+            State.liveSkillsUserId = userId;
+            State.liveSkillsUserName = userName;
+            
+            // Trigger re-render to show live skills view
+            Renderer.renderLiveSkillsView();
+            
+            // Show notification
+            try {
+                showNotification(`Viewing ${userName}'s live skills`, 2000);
+            } catch (e) { }
+        },
+
         closePopup() {
             Dom.popup.container.classList.add("hidden");
         },
@@ -727,6 +1154,16 @@
                 delete State.skillsByUser[uid];
                 Data.updateAll();
                 if (State.currentSpellUserId === uid) Spells.closeWindowIfAny();
+                
+                // If the currently viewed user in live skills is deleted, return to main view
+                if (State.liveSkillsUserId === uid) {
+                    State.viewMode = "main";
+                    State.liveSkillsUserId = null;
+                    State.liveSkillsUserName = null;
+                    try {
+                        showNotification('Player left, returning to main view', 2000);
+                    } catch (e) { }
+                }
             });
 
             State.socket.on("connect_error", (err) => {
@@ -1085,6 +1522,7 @@
         toggleHelp: UI.toggleHelp,
         closeClient: UI.closeClient,
         showPopupForUser: UI.showPopupForUser,
+        showLiveSkillsForUser: UI.showLiveSkillsForUser,
         closePopup: UI.closePopup,
         getOverlayData: __getOverlayData
     });

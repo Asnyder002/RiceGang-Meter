@@ -23,6 +23,7 @@ export class StatisticData {
             value: 0,
             max: 0,
         };
+        this.maxHit = 0; // Track highest single hit
     }
 
     /** 添加数据记录
@@ -33,6 +34,11 @@ export class StatisticData {
      */
     addRecord(value, isCrit, isLucky, hpLessenValue = 0) {
         const now = Date.now();
+
+        // Track max hit
+        if (value > this.maxHit) {
+            this.maxHit = value;
+        }
 
         if (isCrit) {
             if (isLucky) {
@@ -118,5 +124,6 @@ export class StatisticData {
             value: 0,
             max: 0,
         };
+        this.maxHit = 0;
     }
 }

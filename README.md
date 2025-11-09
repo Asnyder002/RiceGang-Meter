@@ -26,10 +26,14 @@ This project is based on and builds upon the work of two prior projects:
 Thanks to both authors for laying the groundwork for this extended variant.
 
 ## Features  
-- Real-time DPS (damage per second) and HPS (healing per second) metrics.  
-- Overlay view that updates dynamically for nearby players.  
-- Extended tracking, logging, and customization options (*Sola Extended* features).  
-- Packet interception and analysis (no modification of the game or BPSR files).
+- **Real-time Performance Tracking**: Live DPS (damage per second) and HPS (healing per second) metrics with per-second updates
+- **Multi-Tab Interface**: Dedicated views for DPS, Healing, and Tank roles with role-specific metrics
+- **Live Skills Breakdown**: Real-time skill analysis showing individual skill performance, hit counts, crit rates, and damage distribution
+- **Tank Damage Timeline**: Specialized damage taken tracking with 1-second windows showing effective damage, absorption, and death events
+- **Death Event Tracking**: Visual death detection with timestamps, attacker information, and distinctive styling
+- **Session Analytics**: Extended tracking, logging, and historical data with session management
+- **Dynamic Overlay**: Updates for nearby players with customizable transparency and positioning
+- **Packet Analysis**: Advanced packet interception and parsing (no game modification required)
 
 ## Getting Started  
 
@@ -66,6 +70,24 @@ The overlay should launch and begin monitoring packets from the game client.
 - Use the overlay to monitor DPS/HPS and other tracked metrics in real time.
 
 ### Interface Overview  
+
+The overlay provides multiple specialized views for different combat roles:
+
+#### DPS Tab
+- Real-time damage output tracking with live skill breakdown
+- Individual skill performance metrics including hit counts, crit rates, and average damage
+- Color-coded skill bars with class-specific theming
+
+#### Heal Tab  
+- HPS-focused metrics with healing skill analysis
+- Healing efficiency tracking and per-skill breakdown
+- Support role optimization insights
+
+#### Tank Tab
+- Damage taken timeline with 1-second window analysis
+- Death event tracking with visual indicators and timestamps
+- Absorption and mitigation detection for defensive analysis
+- Effective vs raw damage distinction
 
 Below are some example views of the overlay in action:  
 

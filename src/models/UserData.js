@@ -54,8 +54,12 @@ export class UserData {
         this.name = '';
         this.damageStats = new StatisticData(this, STAT_TYPES.DAMAGE);
         this.healingStats = new StatisticData(this, STAT_TYPES.HEALING);
-        this.takenDamage = 0; // 承伤
+        this.takenDamage = 0; // Raw damage taken
+        this.effectiveDamageTaken = 0; // Actual HP lost (after mitigation)
+        this.takenDamageEvents = []; // Array to track individual damage taken events
+        this.takenDamageTimeRange = [null, null]; // Track time range for DTPS calculation
         this.deadCount = 0;   // 死亡次数
+        this.deathEvents = []; // Array to track individual death events with timestamps
         this.profession = '...';
         this.skillUsage = new Map(); // 技能使用情况
         this.fightPoint = 0;  // 总评分
@@ -106,10 +110,50 @@ export class UserData {
     }
 
     /** 添加承伤记录 */
-    addTakenDamage(damage, isDead) {
+    /** 添加承受伤害记录 */
+    addTakenDamage(damage, isDead, skillId = null, damageSource = null, attackerName = null, hpLessen = null) {
         this._touch();
-        this.takenDamage += damage;
-        if (isDead) this.deadCount++;
+        this.takenDamage += damage; // Raw damage
+        this.effectiveDamageTaken += (hpLessen !== null ? hpLessen : damage); // Effective damage (HP actually lost)
+        if (isDead) {
+            this.deadCount++;
+            // Record death event with timestamp
+            this.deathEvents.push({
+                timestamp: Date.now(),
+                damage: damage,
+                skillId: skillId,
+                damageSource: damageSource,
+                attackerName: attackerName,
+                hpLessen: hpLessen
+            });
+        }
+        
+        // Update time range for DTPS calculation
+        const now = Date.now();
+        if (!this.takenDamageTimeRange[0]) {
+            this.takenDamageTimeRange[0] = now;
+        }
+        this.takenDamageTimeRange[1] = now;
+        
+        // Calculate mitigation percentage
+        const effectiveDamage = hpLessen !== null ? hpLessen : damage;
+        const mitigationPercent = damage > 0 ? ((damage - effectiveDamage) / damage * 100) : 0;
+        
+        // Store individual damage taken event
+        this.takenDamageEvents.push({
+            timestamp: now,
+            rawDamage: damage,
+            effectiveDamage: effectiveDamage,
+            mitigationPercent: mitigationPercent,
+            skillId: skillId,
+            damageSource: damageSource,
+            attackerName: attackerName,
+            isDead: isDead
+        });
+        
+        // Keep only recent events (last 60 seconds to prevent memory issues)
+        const sixtySecondsAgo = now - 60000;
+        this.takenDamageEvents = this.takenDamageEvents.filter(event => event.timestamp > sixtySecondsAgo);
     }
 
     /** 更新实时DPS和HPS */
@@ -120,6 +164,42 @@ export class UserData {
 
     getTotalDps() { return this.damageStats.getTotalPerSecond(); }
     getTotalHps() { return this.healingStats.getTotalPerSecond(); }
+    
+    getTakenDps() {
+        if (!this.takenDamageTimeRange[0] || !this.takenDamageTimeRange[1]) {
+            return 0;
+        }
+        // Use effective damage taken for DPS calculation (actual HP lost per second)
+        const totalPerSecond = (this.effectiveDamageTaken / (this.takenDamageTimeRange[1] - this.takenDamageTimeRange[0])) * 1000 || 0;
+        if (!Number.isFinite(totalPerSecond)) return 0;
+        return totalPerSecond;
+    }
+    
+    getRawTakenDps() {
+        if (!this.takenDamageTimeRange[0] || !this.takenDamageTimeRange[1]) {
+            return 0;
+        }
+        // Raw damage taken per second (before mitigation)
+        const totalPerSecond = (this.takenDamage / (this.takenDamageTimeRange[1] - this.takenDamageTimeRange[0])) * 1000 || 0;
+        if (!Number.isFinite(totalPerSecond)) return 0;
+        return totalPerSecond;
+    }
+    
+    getMitigationPercent() {
+        if (this.takenDamage === 0) return 0;
+        return ((this.takenDamage - this.effectiveDamageTaken) / this.takenDamage * 100);
+    }
+
+    /** Get recent death events for display */
+    getRecentDeathEvents(limit = 10) {
+        return this.deathEvents
+            .slice(-limit) // Get last N deaths
+            .reverse() // Show most recent first
+            .map(event => ({
+                ...event,
+                relativeTime: Math.floor((Date.now() - event.timestamp) / 1000) // seconds ago
+            }));
+    }
 
     /** 获取合并的次数统计 */
     getTotalCount() {
@@ -143,7 +223,10 @@ export class UserData {
             realtime_hps_max: this.healingStats.realtimeStats.max,
             total_hps: this.getTotalHps(),
             total_healing: { ...this.healingStats.stats },
-            taken_damage: this.takenDamage,
+            taken_damage: this.effectiveDamageTaken, // Use effective damage for main display
+            raw_taken_damage: this.takenDamage, // Keep raw damage available
+            taken_dps: this.getTakenDps(),
+            mitigation_percent: this.getMitigationPercent(),
             profession: this.profession + (this.subProfession ? ` ${this.subProfession}` : ''),
             subProfession: this.subProfession,
             name: this.name,
@@ -185,6 +268,7 @@ export class UserData {
                 luckyCount: stat.count.lucky,
                 critRate,
                 luckyRate,
+                maxHit: stat.maxHit || 0,        // highest single hit
                 // on garde les breakdowns ; pour la lisibilité on duplique vers healingBreakdown aussi
                 damageBreakdown: { ...stat.stats },
                 healingBreakdown: { ...stat.stats },
@@ -192,6 +276,58 @@ export class UserData {
             };
         }
         return skills;
+    }
+
+    /** Get damage taken timeline grouped by 1-second windows */
+    getDamageTakenTimeline() {
+        if (this.takenDamageEvents.length === 0) {
+            return [];
+        }
+
+        // Group events into 1-second windows
+        const windowSize = 1000; // 1 second in milliseconds
+        const windows = new Map();
+        
+        const now = Date.now();
+        const startTime = Math.min(...this.takenDamageEvents.map(e => e.timestamp));
+        
+        for (const event of this.takenDamageEvents) {
+            const windowStart = Math.floor((event.timestamp - startTime) / windowSize) * windowSize + startTime;
+            const windowKey = windowStart;
+            
+            if (!windows.has(windowKey)) {
+                windows.set(windowKey, {
+                    windowStart,
+                    windowEnd: windowStart + windowSize,
+                    totalRawDamage: 0,
+                    totalEffectiveDamage: 0,
+                    events: [],
+                    uniqueSkills: new Set(),
+                    attackerCount: new Set()
+                });
+            }
+            
+            const window = windows.get(windowKey);
+            window.totalRawDamage += event.rawDamage;
+            window.totalEffectiveDamage += event.effectiveDamage;
+            window.events.push(event);
+            if (event.skillId) window.uniqueSkills.add(event.skillId);
+            if (event.attackerName) window.attackerCount.add(event.attackerName);
+        }
+        
+        // Convert to array and sort by time (latest first)
+        return Array.from(windows.values())
+            .sort((a, b) => b.windowStart - a.windowStart)
+            .map(window => ({
+                ...window,
+                relativeTime: Math.round((window.windowStart - startTime) / 1000), // seconds from start
+                skillCount: window.uniqueSkills.size,
+                attackerCount: window.attackerCount.size,
+                averageRawDamage: window.totalRawDamage / window.events.length,
+                averageEffectiveDamage: window.totalEffectiveDamage / window.events.length,
+                mitigationPercent: window.totalRawDamage > 0 ? 
+                    ((window.totalRawDamage - window.totalEffectiveDamage) / window.totalRawDamage * 100) : 0
+            }));
     }
 
     setProfession(profession) {
@@ -224,6 +360,9 @@ export class UserData {
         this.damageStats.reset();
         this.healingStats.reset();
         this.takenDamage = 0;
+        this.effectiveDamageTaken = 0;
+        this.takenDamageEvents = [];
+        this.takenDamageTimeRange = [null, null];
         this.skillUsage.clear();
         this.fightPoint = 0;
         this._touch();

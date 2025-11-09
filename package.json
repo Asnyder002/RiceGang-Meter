@@ -1,7 +1,7 @@
 {
     "name": "ricegang-meter",
     "productName": "RiceGang Meter",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Blue Protocol: Star Resonance - Per Second Overlay By Sola",
     "main": "src/index.js",
     "scripts": {
@@ -12,52 +12,6 @@
         "lint": "echo \"No linting configured\"",
         "format": "prettier --write \"**/*.{js,json,html}\"",
         "check-format": "prettier --check \"**/*.{js,json,html}\""
-    },
-    "config": {
-        "forge": {
-            "publishers": [
-                {
-                    "name": "@electron-forge/publisher-github",
-                    "config": {
-                        "repository": {
-                            "owner": "asnyder002",
-                            "name": "RiceGang-Meter"
-                        },
-                        "prerelease": true,
-                        "draft": false
-                    }
-                }
-            ],
-            "packagerConfig": {
-                "name": "RiceGang-Meter",
-                "icon": "./resources/app.ico",
-                "asar": true,
-                "ignore": [
-                    "^/\\.vs($|/)",
-                    "^/_vdata_dumps($|/)",
-                    "^/logs($|/)?",
-                    "^/tests?($|/)",
-                    "^/\\.git($|/)"
-                ]
-            },
-            "makers": [
-                {
-                    "name": "@electron-forge/maker-zip",
-                    "platforms": [
-                        "darwin",
-                        "linux",
-                        "win32"
-                    ]
-                },
-                {
-                    "name": "@electron-forge/maker-squirrel",
-                    "config": {
-                        "setupIcon": "./resources/app.ico",
-                        "createDesktopShortcut": true
-                    }
-                }
-            ]
-        }
     },
     "keywords": [],
     "author": {

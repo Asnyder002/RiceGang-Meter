@@ -184,11 +184,19 @@ class UserDataManager {
         }
     }
 
-    addTakenDamage(uid, damage, isDead) {
+    addTakenDamage(uid, damage, isDead, skillId = null, damageSource = null, attackerUid = null, hpLessen = null) {
         if (config.IS_PAUSED) return;
         //this.checkTimeoutClear();
         const user = this.getUser(uid);
-        user.addTakenDamage(damage, isDead);
+        
+        // Get attacker name if available
+        let attackerName = null;
+        if (attackerUid) {
+            const attacker = this.users.get(attackerUid);
+            attackerName = attacker ? attacker.name : `Unknown_${attackerUid}`;
+        }
+        
+        user.addTakenDamage(damage, isDead, skillId, damageSource, attackerName, hpLessen);
     }
 
     async addLog(log) {
@@ -278,6 +286,7 @@ class UserDataManager {
             name: user.name,
             profession: user.profession + (user.subProfession ? `-${user.subProfession}` : ''),
             skills: user.getSkillSummary(),
+            damageTakenTimeline: user.getDamageTakenTimeline(),
             attr: user.attr,
         };
     }

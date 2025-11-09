@@ -322,15 +322,21 @@ export class PacketProcessor {
             const value = d.Value;
             const luckyValue = d.LuckyValue;
             const damage = value ?? luckyValue ?? Long.ZERO;
-            if (Long.isLong(damage) ? damage.isZero() : Number(damage) === 0) continue;
+            const hpLessen = toNum(d.HpLessenValue ?? 0);
+            
+            // Check damage type first before filtering
+            const isHeal = d.Type === pb.EDamageType?.Heal;
+            const isImmune = d.Type === pb.EDamageType?.IMMUNE || d.Type === 3; // Type 3 appears to be immune/blocked
+            
+            // Skip only if both damage and hpLessen are zero AND it's not a special damage type
+            const damageAmount = Long.isLong(damage) ? damage.toNumber() : Number(damage);
+            if (damageAmount === 0 && hpLessen === 0 && !isImmune) continue;
 
             const flag = d.TypeFlag ?? 0;
             const isCrit = (flag & 1) === 1;
             const isCauseLucky = (flag & 0b100) === 0b100;
-            const isHeal = d.Type === pb.EDamageType?.Heal;
             const isDead = !!d.IsDead;
             const isLucky = !!luckyValue;
-            const hpLessen = toNum(d.HpLessenValue ?? 0);
             const damageElement = getDamageElement(d.Property);
             const damageSource = d.DamageSource ?? 0;
 
@@ -340,8 +346,29 @@ export class PacketProcessor {
                         attackerIsPlayer ? attackerUuid.toNumber() : 0,
                         skillId, damageElement, Number(damage), isCrit, isLucky, isCauseLucky, targetUuid.toNumber()
                     );
+                } else if (isImmune) {
+                    // Handle immune/blocked damage - usually shows as VAL=0 or VAL=1 with HPLSN=0
+                    // We'll still track this as a damage event for completeness
+                    userDataManager.addTakenDamage(
+                        targetUuid.toNumber(), 
+                        Number(damage), 
+                        isDead, 
+                        skillId, 
+                        damageSource, 
+                        attackerIsPlayer ? attackerUuid.toNumber() : null,
+                        hpLessen
+                    );
                 } else {
-                    userDataManager.addTakenDamage(targetUuid.toNumber(), Number(damage), isDead);
+                    // Regular damage taken (including absorption cases where damageAmount > hpLessen)
+                    userDataManager.addTakenDamage(
+                        targetUuid.toNumber(), 
+                        Number(damage), 
+                        isDead, 
+                        skillId, 
+                        damageSource, 
+                        attackerIsPlayer ? attackerUuid.toNumber() : null,
+                        hpLessen
+                    );
                 }
                 if (isDead) userDataManager.setAttrKV(targetUuid.toNumber(), 'hp', 0);
             } else {
@@ -360,7 +387,7 @@ export class PacketProcessor {
             if (isCauseLucky) extra.push('CauseLucky');
             if (!extra.length) extra.push('Normal');
 
-            const actionType = isHeal ? 'HEAL' : 'DMG';
+            const actionType = isHeal ? 'HEAL' : (isImmune ? 'IMMUNE' : 'DMG');
             let infoStr = 'SRC: ';
 
             if (attackerIsPlayer) {
